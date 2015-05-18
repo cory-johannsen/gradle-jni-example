@@ -1,0 +1,9 @@
+server:
+    port: 8888
+
+service:
+    name: Gradle-Jni-Example
+
+logging:
+    level:
+        example: DEBUG

@@ -1,0 +1,171 @@
+import java.util.regex.Pattern
+
+task wrapper(type: Wrapper) {
+    gradleVersion = '2.3'
+}
+
+buildscript {
+    repositories {
+        mavenCentral()
+        mavenLocal()
+        jcenter()
+
+    }
+    dependencies {
+        classpath 'org.springframework.boot:spring-boot-gradle-plugin:1.0.2.RELEASE'
+        classpath 'org.springframework:springloaded:1.2.0.RELEASE'
+    }
+}
+
+apply plugin: 'java'
+apply plugin: 'idea'
+apply plugin: 'spring-boot'
+apply plugin: 'cpp'
+
+idea {
+    module {
+        inheritOutputDirs = false
+        outputDir = file("$buildDir/classes/main/")
+    }
+}
+
+repositories {
+    mavenCentral()
+
+    maven {
+        url 'http://repo.spring.io/milestone'
+    }
+
+    maven {
+        url 'http://repo.spring.io/libs-snapshot'
+    }
+
+}
+
+test {
+    jvmArgs += [ "-Xmx1024M" ]
+}
+
+println "Building on OS: " + System.properties['os.name']
+println "Using JDK: " + System.properties['java.home']
+
+def SYS_INCLUDE_DIR = this.properties['system.include.dir']
+def SYS_LOCAL_INCLUDE_DIR = this.properties['system.local.include.dir']
+def JNI_INCLUDE_DIR = this.properties['jni.include.dir']
+def JNI_LIB_DIR = this.properties['jni.lib.dir']
+
+println "Using system include directory: " + SYS_INCLUDE_DIR
+println "Using system local include directory: " + SYS_LOCAL_INCLUDE_DIR
+println "Using JNI include directory: " + JNI_INCLUDE_DIR
+println "Using JNI lib directory: " + JNI_LIB_DIR
+
+model {
+    components {
+        bridge(NativeLibrarySpec) {
+            sources {
+                cpp {
+                    source {
+                        srcDir 'src/main/jni'
+                        include "**/*.cpp"
+                    }
+                }
+            }
+            buildTypes {
+                debug
+                release
+            }
+        }
+    }
+    toolChains {
+        gcc(Gcc) {
+            eachPlatform {
+                if (System.properties['os.name'].equals('Mac OS X')) {
+                    cppCompiler.withArguments { args ->
+                        args << "-O2"
+                        args << "-I" + SYS_INCLUDE_DIR
+                        args << "-I" + SYS_LOCAL_INCLUDE_DIR
+                        args << "-I" + JNI_INCLUDE_DIR
+                        args << "-I" + JNI_INCLUDE_DIR + "/darwin"
+                        args << "-std=c++11"
+                    }
+                    linker.withArguments { args ->
+                        args << "-O2"
+                        args << "-lc++"
+                    }
+                } else {
+                    path "/opt/rh/devtoolset-2/root/usr/bin/gcc"
+                    cppCompiler.withArguments { args ->
+                        args << "-O2"
+                        args << "-I" + SYS_INCLUDE_DIR
+                        args << "-I" + SYS_LOCAL_INCLUDE_DIR
+                        args << "-I" + JNI_INCLUDE_DIR
+                        args << "-I" + JNI_INCLUDE_DIR + "/linux"
+                        args << "-std=c++11"
+                    }
+                    linker.withArguments { args ->
+                        args << "-O2"
+                        args << "-lstdc++"
+                    }
+                }
+            }
+        }
+        clang(Clang) {
+            eachPlatform {
+                if (System.properties['os.name'].equals('Mac OS X')) {
+                    cppCompiler.withArguments { args ->
+                        args << "-O2"
+                        args << "-I" + SYS_INCLUDE_DIR
+                        args << "-I" + SYS_LOCAL_INCLUDE_DIR
+                        args << "-I" + JNI_INCLUDE_DIR
+                        args << "-I" + JNI_INCLUDE_DIR + "/darwin"
+                        args << "-std=c++11"
+                    }
+                    linker.withArguments { args ->
+                        args << "-O2"
+                        args << "-lc++"
+                    }
+                } else {
+                    cppCompiler.withArguments { args ->
+                        args << "-O2"
+                        args << "-I" + SYS_INCLUDE_DIR
+                        args << "-I" + SYS_LOCAL_INCLUDE_DIR
+                        args << "-I" + JNI_INCLUDE_DIR
+                        args << "-I" + JNI_INCLUDE_DIR + "/linux"
+                        args << "-std=c++11"
+                    }
+                    linker.withArguments { args ->
+                        args << "-O2"
+                        args << "-lstdc++"
+                    }
+                }
+            }
+        }
+    }
+}
+
+task copyLibBridge(type: Copy) {
+    if (System.properties['os.name'].equals('Mac OS X')) {
+        from "$projectDir/build/binaries/bridgeSharedLibrary/libbridge.dylib"
+    }
+    else {
+        from "$projectDir/build/binaries/bridgeSharedLibrary/libbridge.so"
+    }
+    into 'libs'
+}
+
+dependencies {
+    compile 'org.springframework.boot:spring-boot-starter-web:1.1.6.RELEASE'
+    compile 'org.springframework:spring-context-support:4.0.2.RELEASE'
+    compile 'org.jolokia:jolokia-core:1.2.3'
+    compile 'org.yaml:snakeyaml:1.13'
+    compile 'com.fasterxml.jackson.core:jackson-databind'
+    compile 'org.apache.httpcomponents:httpclient:4.2.3'
+    compile 'org.apache.httpcomponents:httpmime:4.2.3'
+    compile 'org.apache.commons:commons-compress:1.8.1'
+    compile 'ch.qos.logback:logback-classic:1.1.2'
+    compile group: 'com.google.guava', name: 'guava', version: '17.0'
+
+    testCompile 'org.springframework.boot:spring-boot-starter-test:1.0.2.RELEASE'
+    testCompile "junit:junit:4.11"
+}
+
